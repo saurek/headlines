@@ -14,9 +14,12 @@ RSS_FEEDS = {'bbc': 'http://feeds.bbci.co.uk/news/rss.xml',
              'tbt': 'http://feeds.feedburner.com/TheBalticTimesNews'}
 
 DEFAULTS = {'publication': 'tbt',
-            'city': 'Vilnius, LT'
+            'city': 'Vilnius, LT',
+            'currency_from': 'EUR',
+            'currency_to': 'USD'
             }
 WEATHER_URL = "http://api.openweathermap.org/data/2.5/weather?q={}&units=metric&appid=47258b3b6592bb72b736e9746e9148d7"
+CURRENCY_URL = "https://openexchangerates.org//api/latest.json?app_id=ba548b6f2c3a4fec80baa69a364f2e0b"
 
 
 @app.route("/")
@@ -31,8 +34,18 @@ def home():
     if not city:
         city = DEFAULTS['city']
     weather = get_weather(city)
+    # get customized currency based on user input or default
+    currency_from = request.args.get("currency_from")
+    if not currency_from:
+        currency_from = DEFAULTS['currency_from']
+    currency_to = request.args.get('currency_to')
+    if not currency_to:
+        currency_to = DEFAULTS['currency_to']
+    rate, currencies = get_rate(currency_from, currency_to)
     return render_template("home.html", articles=articles,
-                           weather=weather)
+                           weather=weather, currency_from=currency_from,
+                           currency_to=currency_to, rate=rate,
+                           currencies=sorted(currencies))
 
 
 def get_news(query):
@@ -59,6 +72,14 @@ def get_weather(query):
                    'country': parsed['sys']['country']
                    }
     return weather
+
+
+def get_rate(frm, to):
+    all_currency = urllib.request.urlopen(CURRENCY_URL).read()
+    parsed = json.loads(all_currency.decode('utf-8')).get('rates')
+    frm_rate = parsed.get(frm.upper())
+    to_rate = parsed.get(to.upper())
+    return (to_rate / frm_rate, parsed.keys())
 
 
 if __name__ == '__main__':
